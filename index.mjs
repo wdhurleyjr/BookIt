@@ -7,22 +7,16 @@ const app = express();
 
 app.set('view engine', 'ejs');
 app.use(express.static('public'));
-
-// For Express to get values using POST method (form-urlencoded)
-app.use(express.urlencoded({ extended: true }));
-
-// ✅ ADD THIS to parse JSON bodies (e.g., fetch POST requests)
-app.use(express.json());
-
+app.use(express.urlencoded({ extended: true })); // For form data
+app.use(express.json()); // ✅ For JSON body (for fetch())
 app.set('trust proxy', 1);
+
 app.use(session({
   secret: 'cst336',
   resave: false,
   saveUninitialized: true,
-  //cookie: { secure: true }
 }));
 
-// Setting up database connection pool
 const pool = mysql.createPool({
   host: "cst336whurleyjrsp25.com",
   user: "cstwhurl_webuser",
@@ -34,13 +28,17 @@ const pool = mysql.createPool({
 
 const conn = await pool.getConnection();
 
-// Login, Signup, and Logout Services
-app.get('/', async (req, res) => {
-  res.render('login.ejs');
-});
+// Middleware to check authentication
+function isAuthenticated(req, res, next) {
+  if (req.session.userAuth) {
+    next();
+  } else {
+    res.redirect("/");
+  }
+}
 
-app.get('/logout', (req, res) => {
-  req.session.destroy();
+// Routes
+app.get('/', async (req, res) => {
   res.render('login.ejs');
 });
 
@@ -56,16 +54,11 @@ app.post('/signup', async (req, res) => {
     INSERT INTO users (firstName, lastName, username, password)
     VALUES (?, ?, ?, ?)
   `;
-
   await conn.query(sql, [firstName, lastName, username, hashedPassword]);
   res.redirect('/');
 });
 
-app.get('/profile', isAuthenticated, (req, res) => {
-  res.render('profile.ejs', { fullName: req.session.fullName });
-});
-
-app.post("/login", async (req, res) => {
+app.post('/login', async (req, res) => {
   const { username, password } = req.body;
   const sql = `SELECT * FROM users WHERE username = ?`;
   const [rows] = await conn.query(sql, [username]);
@@ -78,49 +71,47 @@ app.post("/login", async (req, res) => {
       req.session.userAuth = true;
       req.session.userId = rows[0].userId;
       req.session.fullName = rows[0].firstName + " " + rows[0].lastName;
-      res.render('home.ejs', { fullName: req.session.fullName });
+      res.redirect('/home');
       return;
     }
   }
   res.render('login.ejs', { error: "Wrong credentials!" });
 });
 
-function isAuthenticated(req, res, next) {
-  if (req.session.userAuth) {
-    next();
-  } else {
-    res.redirect("/");
-  }
-}
+app.get('/logout', (req, res) => {
+  req.session.destroy();
+  res.render('login.ejs');
+});
+
+app.get('/home', isAuthenticated, (req, res) => {
+  res.render('home.ejs', { fullName: req.session.fullName });
+});
+
+app.get('/editEvent', isAuthenticated, async (req, res) => {
+  const userId = req.session.userId;
+  const sql = `SELECT * FROM event WHERE userId = ? ORDER BY eventDate ASC`;
+  const [events] = await conn.query(sql, [userId]);
+  res.render('editEvent.ejs', { events });
+});
 
 // Google Places API
 app.get('/api/restaurants', async (req, res) => {
-    const lat = req.query.lat;
-    const lng = req.query.lng;
-    const radius = req.query.radius || 1500;
-    const apiKey = "AIzaSyDomEvMi4AHccGjMedgRCeJSFsBEZTaARM";
-  
-    console.log(`[API CALL] /api/restaurants`);
-    console.log(`Query Parameters - lat: ${lat}, lng: ${lng}, radius: ${radius}`);
-  
-    try {
-      const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&type=restaurant&key=${apiKey}`;
-      console.log(`Fetching data from: ${url}`);
-  
-      const response = await fetch(url);
-      const data = await response.json();
-  
-      console.log(`Fetched ${data.results ? data.results.length : 0} restaurants.`);
-  
-      res.json(data);
-    } catch (error) {
-      console.error(`[ERROR] Failed to fetch restaurants:`, error);
-      res.status(500).json({ message: 'Error fetching restaurant data' });
-    }
-  });
-  
+  const { lat, lng, radius = 1500 } = req.query;
+  const apiKey = "AIzaSyDomEvMi4AHccGjMedgRCeJSFsBEZTaARM";
 
-// Save Places
+  console.log(`[API CALL] /api/restaurants lat=${lat}, lng=${lng}`);
+  try {
+    const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&type=restaurant&key=${apiKey}`;
+    const response = await fetch(url);
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error(`[ERROR] /api/restaurants`, error);
+    res.status(500).json({ message: "Error fetching restaurant data" });
+  }
+});
+
+// Save a new place if it doesn't exist yet
 app.post('/api/savePlace', async (req, res) => {
   const { name, googlePlaceId, lat, lng, address, photo } = req.body;
 
@@ -135,25 +126,27 @@ app.post('/api/savePlace', async (req, res) => {
     INSERT INTO place (name, googlePlaceId, lat, lng, address, photo)
     VALUES (?, ?, ?, ?, ?, ?)
   `;
-
   await conn.query(insertSql, [name, googlePlaceId, lat, lng, address, photo]);
   res.json({ message: 'Place saved successfully' });
 });
 
-// WeatherAPI.com - Fetch weather data
+// Weather API
 app.get('/api/weather', async (req, res) => {
-  const lat = req.query.lat;
-  const lng = req.query.lng;
+  const { lat, lng } = req.query;
   const apiKey = "f28e28db5182453b865203056242803";
-
-  const url = `https://api.weatherapi.com/v1/current.json?key=${apiKey}&q=${lat},${lng}`;
-  const response = await fetch(url);
-  const data = await response.json();
-  res.json(data);
+  try {
+    const url = `https://api.weatherapi.com/v1/current.json?key=${apiKey}&q=${lat},${lng}`;
+    const response = await fetch(url);
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error(`[ERROR] /api/weather`, error);
+    res.status(500).json({ message: "Error fetching weather data" });
+  }
 });
 
-// Create Event
-app.post('/createEvent', async (req, res) => {
+// Create a new event
+app.post('/createEvent', isAuthenticated, async (req, res) => {
   const { restaurantName, eventName, eventDate, eventTime } = req.body;
   const userId = req.session.userId;
 
@@ -161,11 +154,34 @@ app.post('/createEvent', async (req, res) => {
     INSERT INTO event (restName, eventName, eventDate, eventTime, userId)
     VALUES (?, ?, ?, ?, ?)
   `;
-
   await conn.query(sql, [restaurantName, eventName, eventDate, eventTime, userId]);
-  res.redirect('home');
+  res.redirect('/editEvent');
 });
 
 app.listen(3000, () => {
-  console.log("Express server running");
+  console.log('Express server running on http://localhost:3000');
 });
+
+app.post('/updateEvent', isAuthenticated, async (req, res) => {
+    const { eventId, restaurantName, eventName, eventDate, eventTime } = req.body;
+    const userId = req.session.userId;
+  
+    const sql = `
+      UPDATE event
+      SET restName = ?, eventName = ?, eventDate = ?, eventTime = ?
+      WHERE eventId = ? AND userId = ?
+    `;
+  
+    await conn.query(sql, [restaurantName, eventName, eventDate, eventTime, eventId, userId]);
+    res.redirect('/editEvent'); // Redirect back to editEvent page after update
+  });
+
+  // Delete Event
+app.delete('/deleteEvent/:eventId', async (req, res) => {
+    const { eventId } = req.params;
+    const sql = `DELETE FROM event WHERE eventId = ?`;
+  
+    await conn.query(sql, [eventId]);
+    res.json({ message: 'Event deleted successfully' });
+  });
+  
