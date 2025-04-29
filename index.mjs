@@ -7,8 +7,8 @@ const app = express();
 
 app.set('view engine', 'ejs');
 app.use(express.static('public'));
-app.use(express.urlencoded({ extended: true })); // For form data
-app.use(express.json()); // ✅ For JSON body (for fetch())
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 app.set('trust proxy', 1);
 
 app.use(session({
@@ -28,7 +28,6 @@ const pool = mysql.createPool({
 
 const conn = await pool.getConnection();
 
-// Middleware to check authentication
 function isAuthenticated(req, res, next) {
   if (req.session.userAuth) {
     next();
@@ -94,7 +93,6 @@ app.get('/editEvent', isAuthenticated, async (req, res) => {
   res.render('editEvent.ejs', { events });
 });
 
-// Google Places API
 app.get('/api/restaurants', async (req, res) => {
   const { lat, lng, radius = 1500 } = req.query;
   const apiKey = "AIzaSyDomEvMi4AHccGjMedgRCeJSFsBEZTaARM";
@@ -111,7 +109,6 @@ app.get('/api/restaurants', async (req, res) => {
   }
 });
 
-// Save a new place if it doesn't exist yet
 app.post('/api/savePlace', async (req, res) => {
   const { name, googlePlaceId, lat, lng, address, photo } = req.body;
 
@@ -145,7 +142,6 @@ app.get('/api/weather', async (req, res) => {
   }
 });
 
-// Create a new event
 app.post('/createEvent', isAuthenticated, async (req, res) => {
   const { restaurantName, eventName, eventDate, eventTime } = req.body;
   const userId = req.session.userId;
@@ -173,7 +169,7 @@ app.post('/updateEvent', isAuthenticated, async (req, res) => {
     `;
   
     await conn.query(sql, [restaurantName, eventName, eventDate, eventTime, eventId, userId]);
-    res.redirect('/editEvent'); // Redirect back to editEvent page after update
+    res.redirect('/editEvent');
   });
 
   // Delete Event
