@@ -3,6 +3,7 @@ import mysql from 'mysql2/promise';
 import bcrypt from 'bcrypt';
 import session from 'express-session';
 
+// test
 const app = express();
 
 app.set('view engine', 'ejs');
