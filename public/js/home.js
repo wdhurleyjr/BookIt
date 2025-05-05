@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', async function () {
       const lng = position.coords.longitude;
       map.setCenter([lng, lat]);
       await loadRestaurants(lat, lng);
+      await updateWeather(lat, lng);
     },
     async function (error) {
         console.warn('⚠️ Geolocation failed or timed out:', error.message || error);
@@ -29,6 +30,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         enableHighAccuracy: true // (Optional) Request more accurate location (can be slower)
     });         
   } else {
+    console.warn('⚠️ Geolocation not supported by browser.');
     loadRestaurants(37.7749, -122.4194);
   }
   map.on('click', async function (e) {
@@ -37,6 +39,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     console.log(`🖱️ Map clicked: ${lat}, ${lng}`);
     map.setCenter([lng, lat]);
     await loadRestaurants(lat, lng);
+    await updateWeather(lat, lng);
     
   });
 
@@ -78,6 +81,22 @@ document.addEventListener('DOMContentLoaded', async function () {
       }
     } catch (error) {
       console.error('❌ Error loading restaurants:', error);
+    }
+  }
+  async function updateWeather(lat, lng) {
+    try {
+      const response = await fetch(`/api/weather?lat=${lat}&lng=${lng}`);
+      const data = await response.json();
+  
+      const weatherSpan = document.getElementById('weatherInfo');
+      if (weatherSpan && data && data.current && data.location) {
+        const temp = data.current.temp_f;
+        const condition = data.current.condition.text;
+        const city = data.location.name;
+        weatherSpan.textContent = `Weather:  ${temp}°F, ${condition} in ${city}`;
+      }
+    } catch (err) {
+      console.error('❌ Error loading weather:', err);
     }
   }
   
