@@ -24,9 +24,12 @@
     <h1 class="mb-4">Welcome, <%= fullName %>!</h1>
 
     <div class="card mb-4">
-      <h5 class="card-header">Select a Restaurant</h5>
-      <div id="map"></div>
-    </div>
+        <h5 class="card-header d-flex justify-content-between align-items-center">
+          <span>Select a Restaurant</span>
+          <span id="weatherInfo" class="text-muted" style="font-weight: normal;"></span>
+        </h5>
+        <div id="map"></div>
+      </div>
 
     <div id="createEventForm" class="card p-4 mb-5 d-none">
         <h2>Create a New Event</h2>

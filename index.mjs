@@ -3,6 +3,7 @@ import mysql from 'mysql2/promise';
 import bcrypt from 'bcrypt';
 import session from 'express-session';
 
+// test
 const app = express();
 
 app.set('view engine', 'ejs');
@@ -132,7 +133,7 @@ app.get('/api/weather', async (req, res) => {
   const { lat, lng } = req.query;
   const apiKey = "f28e28db5182453b865203056242803";
   try {
-    const url = `https://api.weatherapi.com/v1/current.json?key=${apiKey}&q=${lat},${lng}`;
+    const url = `https://api.weatherapi.com/v1/current.json?key=${apiKey}&q=${lat},${lng}&aqi=no`;
     const response = await fetch(url);
     const data = await response.json();
     res.json(data);
