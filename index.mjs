@@ -83,6 +83,7 @@ app.get('/logout', (req, res) => {
   res.render('login.ejs');
 });
 
+// Protected Routes
 app.get('/home', isAuthenticated, (req, res) => {
   res.render('home.ejs', { fullName: req.session.fullName });
 });
@@ -94,7 +95,42 @@ app.get('/editEvent', isAuthenticated, async (req, res) => {
   res.render('editEvent.ejs', { events });
 });
 
-app.get('/api/restaurants', async (req, res) => {
+app.post('/createEvent', isAuthenticated, async (req, res) => {
+  const { restaurantName, eventName, eventDate, eventTime } = req.body;
+  const userId = req.session.userId;
+
+  const sql = `
+    INSERT INTO event (restName, eventName, eventDate, eventTime, userId)
+    VALUES (?, ?, ?, ?, ?)
+  `;
+  await conn.query(sql, [restaurantName, eventName, eventDate, eventTime, userId]);
+  res.redirect('/editEvent');
+});
+
+app.post('/updateEvent', isAuthenticated, async (req, res) => {
+  const { eventId, restaurantName, eventName, eventDate, eventTime } = req.body;
+  const userId = req.session.userId;
+
+  const sql = `
+    UPDATE event
+    SET restName = ?, eventName = ?, eventDate = ?, eventTime = ?
+    WHERE eventId = ? AND userId = ?
+  `;
+
+  await conn.query(sql, [restaurantName, eventName, eventDate, eventTime, eventId, userId]);
+  res.redirect('/editEvent');
+});
+
+app.delete('/deleteEvent/:eventId', isAuthenticated, async (req, res) => {
+  const { eventId } = req.params;
+  const sql = `DELETE FROM event WHERE eventId = ?`;
+
+  await conn.query(sql, [eventId]);
+  res.json({ message: 'Event deleted successfully' });
+});
+
+// API Routes
+app.get('/api/restaurants', isAuthenticated, async (req, res) => {
   const { lat, lng, radius = 1500 } = req.query;
   const apiKey = "AIzaSyDomEvMi4AHccGjMedgRCeJSFsBEZTaARM";
 
@@ -110,7 +146,7 @@ app.get('/api/restaurants', async (req, res) => {
   }
 });
 
-app.post('/api/savePlace', async (req, res) => {
+app.post('/api/savePlace', isAuthenticated, async (req, res) => {
   const { name, googlePlaceId, lat, lng, address, photo } = req.body;
 
   const checkSql = `SELECT * FROM place WHERE googlePlaceId = ?`;
@@ -129,7 +165,7 @@ app.post('/api/savePlace', async (req, res) => {
 });
 
 // Weather API
-app.get('/api/weather', async (req, res) => {
+app.get('/api/weather', isAuthenticated, async (req, res) => {
   const { lat, lng } = req.query;
   const apiKey = "f28e28db5182453b865203056242803";
   try {
@@ -143,73 +179,6 @@ app.get('/api/weather', async (req, res) => {
   }
 });
 
-app.post('/createEvent', isAuthenticated, async (req, res) => {
-  const { restaurantName, eventName, eventDate, eventTime } = req.body;
-  const userId = req.session.userId;
-
-  const sql = `
-    INSERT INTO event (restName, eventName, eventDate, eventTime, userId)
-    VALUES (?, ?, ?, ?, ?)
-  `;
-  await conn.query(sql, [restaurantName, eventName, eventDate, eventTime, userId]);
-  res.redirect('/editEvent');
-});
-
-// Add this endpoint before your app.listen() call
-app.post('/api/savePin', isAuthenticated, async (req, res) => {
-  const { lat, lng, title, description } = req.body;
-  const userId = req.session.userId;
-
-  const sql = `
-    INSERT INTO pin (userId, lat, lng, title, description)
-    VALUES (?, ?, ?, ?, ?)
-  `;
-  
-  try {
-    await conn.query(sql, [userId, lat, lng, title, description]);
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Error saving pin:', error);
-    res.status(500).json({ success: false });
-  }
-});
-
-app.get('/api/getPins', isAuthenticated, async (req, res) => {
-  const userId = req.session.userId;
-  
-  try {
-    const [pins] = await conn.query('SELECT * FROM pin WHERE userId = ?', [userId]);
-    res.json(pins);
-  } catch (error) {
-    console.error('Error fetching pins:', error);
-    res.status(500).json({ error: 'Failed to fetch pins' });
-  }
-});
-
 app.listen(3000, () => {
   console.log('Express server running on http://localhost:3000');
 });
-
-app.post('/updateEvent', isAuthenticated, async (req, res) => {
-    const { eventId, restaurantName, eventName, eventDate, eventTime } = req.body;
-    const userId = req.session.userId;
-  
-    const sql = `
-      UPDATE event
-      SET restName = ?, eventName = ?, eventDate = ?, eventTime = ?
-      WHERE eventId = ? AND userId = ?
-    `;
-  
-    await conn.query(sql, [restaurantName, eventName, eventDate, eventTime, eventId, userId]);
-    res.redirect('/editEvent');
-  });
-
-  // Delete Event
-app.delete('/deleteEvent/:eventId', async (req, res) => {
-    const { eventId } = req.params;
-    const sql = `DELETE FROM event WHERE eventId = ?`;
-  
-    await conn.query(sql, [eventId]);
-    res.json({ message: 'Event deleted successfully' });
-  });
-  
