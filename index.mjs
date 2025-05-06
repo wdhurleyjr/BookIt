@@ -155,37 +155,6 @@ app.post('/createEvent', isAuthenticated, async (req, res) => {
   res.redirect('/editEvent');
 });
 
-// Add this endpoint before your app.listen() call
-app.post('/api/savePin', isAuthenticated, async (req, res) => {
-  const { lat, lng, title, description } = req.body;
-  const userId = req.session.userId;
-
-  const sql = `
-    INSERT INTO pin (userId, lat, lng, title, description)
-    VALUES (?, ?, ?, ?, ?)
-  `;
-  
-  try {
-    await conn.query(sql, [userId, lat, lng, title, description]);
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Error saving pin:', error);
-    res.status(500).json({ success: false });
-  }
-});
-
-app.get('/api/getPins', isAuthenticated, async (req, res) => {
-  const userId = req.session.userId;
-  
-  try {
-    const [pins] = await conn.query('SELECT * FROM pin WHERE userId = ?', [userId]);
-    res.json(pins);
-  } catch (error) {
-    console.error('Error fetching pins:', error);
-    res.status(500).json({ error: 'Failed to fetch pins' });
-  }
-});
-
 app.listen(3000, () => {
   console.log('Express server running on http://localhost:3000');
 });
