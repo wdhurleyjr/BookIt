@@ -214,3 +214,36 @@ function selectRestaurant(name) {
     form.scrollIntoView({ behavior: 'smooth' });
   }
 }
+function populateModal(eventData) {
+  console.log('Populating modal with event:', eventData);
+
+  document.getElementById('eventId').value = eventData.eventId;
+  document.getElementById('eventName').value = eventData.eventName;
+  document.getElementById('restName').value = eventData.restName;
+
+  const eventDateInput = document.getElementById('eventDate');
+  const dateOnly = eventData.eventDate ? eventData.eventDate.split('T')[0] : '';
+  eventDateInput.value = dateOnly;
+
+  document.getElementById('eventTime').value = eventData.eventTime;
+}
+  
+async function deleteEvent() {
+  const eventId = document.getElementById('eventId').value;
+
+  if (confirm('Are you sure you want to delete this event?')) {
+    try {
+        const response = await fetch(`/deleteEvent/${eventId}`, {
+        method: 'DELETE'
+        });
+
+        const result = await response.json();
+        console.log(result.message);
+
+        // Refresh page after delete
+        window.location.reload();
+    } catch (error) {
+        console.error('Error deleting event:', error);
+    }
+  }
+}
