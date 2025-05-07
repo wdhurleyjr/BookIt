@@ -178,6 +178,32 @@ app.get('/api/weather', isAuthenticated, async (req, res) => {
     res.status(500).json({ message: "Error fetching weather data" });
   }
 });
+// Add these endpoints before app.listen()
+app.post('/api/savePin', isAuthenticated, async (req, res) => {
+  const { lat, lng, title, description } = req.body;
+  const userId = req.session.userId;
+
+  try {
+    await conn.query(
+      'INSERT INTO pin (userId, lat, lng, title, description) VALUES (?, ?, ?, ?, ?)',
+      [userId, lat, lng, title, description]
+    );
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error saving pin:', error);
+    res.status(500).json({ success: false });
+  }
+});
+
+app.get('/api/getPins', isAuthenticated, async (req, res) => {
+  try {
+    const [pins] = await conn.query('SELECT * FROM pin WHERE userId = ?', [req.session.userId]);
+    res.json(pins);
+  } catch (error) {
+    console.error('Error fetching pins:', error);
+    res.status(500).json({ error: 'Failed to fetch pins' });
+  }
+});
 
 app.listen(3000, () => {
   console.log('Express server running on http://localhost:3000');
