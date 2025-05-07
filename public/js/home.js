@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', async function () {
   mapboxgl.accessToken = 'pk.eyJ1Ijoid2RodXJsZXlqciIsImEiOiJjbWEyMjh2MTIwZXA3MmpvbGtrZnBtZGlzIn0.HiCoA6sWpkoi1EDAkb1xeA';
-
+  let addPinMode = false;
+  let currentPinMarker = null;
   const map = new mapboxgl.Map({
     container: 'map',
     style: 'mapbox://styles/mapbox/streets-v11',
@@ -8,41 +9,126 @@ document.addEventListener('DOMContentLoaded', async function () {
     zoom: 13
   });
 
-  console.log('Checking for geolocation...');
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
-    async function (position) {
-      console.log('✅ Geolocation success:', position.coords);
-      const lat = position.coords.latitude;
-      const lng = position.coords.longitude;
-      map.setCenter([lng, lat]);
-      await loadRestaurants(lat, lng);
-      await updateWeather(lat, lng);
-    },
-    async function (error) {
-        console.warn('⚠️ Geolocation failed or timed out:', error.message || error);
-        console.log('Fallback to San Francisco.');
-        map.setCenter([-122.4194, 37.7749]);
-        await loadRestaurants(37.7749, -122.4194);
-    },
-    {
-        timeout: 5000, // ⏳ MAXIMUM wait: 5 seconds
-        enableHighAccuracy: true // (Optional) Request more accurate location (can be slower)
-    });         
-  } else {
-    console.warn('⚠️ Geolocation not supported by browser.');
-    loadRestaurants(37.7749, -122.4194);
-  }
-  map.on('click', async function (e) {
-    const lat = e.lngLat.lat;
-    const lng = e.lngLat.lng;
-    console.log(`🖱️ Map clicked: ${lat}, ${lng}`);
-    map.setCenter([lng, lat]);
-    await loadRestaurants(lat, lng);
-    await updateWeather(lat, lng);
-    
+  await initializeMap();
+  
+
+   // Custom Pin Handlers
+  document.getElementById('addPinBtn')?.addEventListener('click', () => {
+    addPinMode = true;
+    document.getElementById('pinControls').classList.remove('d-none');
   });
 
+  document.getElementById('cancelPinBtn')?.addEventListener('click', () => {
+    addPinMode = false;
+    document.getElementById('pinControls').classList.add('d-none');
+    if (currentPinMarker) currentPinMarker.remove();
+  });
+
+  document.getElementById('pinForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const title = document.getElementById('pinTitle').value;
+    const description = document.getElementById('pinDescription').value;
+    
+    if (currentPinMarker) {
+      const lngLat = currentPinMarker.getLngLat();
+      await saveCustomPin(lngLat.lat, lngLat.lng, title, description);
+      document.getElementById('pinForm').reset();
+      document.getElementById('pinControls').classList.add('d-none');
+      currentPinMarker.remove();
+      addPinMode = false;
+    }
+  });
+
+     // Existing Core Functions
+   async function initializeMap() {
+    // Geolocation Logic
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          await updateMapPosition(lat, lng);
+        },
+        async (error) => {
+          console.warn('Geolocation failed:', error);
+          await updateMapPosition(37.7749, -122.4194);
+        },
+        { timeout: 5000, enableHighAccuracy: true }
+      );
+    } else {
+      await updateMapPosition(37.7749, -122.4194);
+    }
+
+    // Map Click Handler
+    map.on('click', async (e) => {
+      if (addPinMode) {
+        if (currentPinMarker) currentPinMarker.remove();
+        currentPinMarker = new mapboxgl.Marker({ color: '#FF0000' })
+          .setLngLat([e.lngLat.lng, e.lngLat.lat])
+          .addTo(map);
+      } else {
+        await updateMapPosition(e.lngLat.lat, e.lngLat.lng);
+      }
+    });
+
+    // Event Delegation for Create Event Buttons
+    document.body.addEventListener('click', (e) => {
+      if (e.target.classList.contains('create-event-btn')) {
+        const placeName = e.target.dataset.name;
+        selectRestaurant(placeName);
+      }
+    });
+  }
+  async function updateMapPosition(lat, lng) {
+    map.setCenter([lng, lat]);
+    await Promise.all([
+      loadRestaurants(lat, lng),
+      loadCustomPins(lat, lng),
+      updateWeather(lat, lng)
+    ]);
+  }
+
+  // Custom Pin Functions
+  async function saveCustomPin(lat, lng, title, description) {
+    try {
+      const response = await fetch('/api/savePin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lat, lng, title, description })
+      });
+      if (response.ok) await loadCustomPins(lat, lng);
+    } catch (error) {
+      console.error('Error saving pin:', error);
+    }
+  }
+
+  async function loadCustomPins() {
+    try {
+      const pins = await fetch('/api/getPins').then(res => res.json());
+      pins.forEach(pin => createPinMarker(pin));
+    } catch (error) {
+      console.error('Error loading pins:', error);
+    }
+  }
+
+  function createPinMarker(pin) {
+    const el = document.createElement('div');
+    el.className = 'custom-marker';
+    el.innerHTML = '<i class="fa fa-map-pin fa-2x" style="color: #4CAF50;"></i>';
+
+    new mapboxgl.Marker(el)
+      .setLngLat([pin.lng, pin.lat])
+      .setPopup(new mapboxgl.Popup().setHTML(`
+        <h5>${pin.title}</h5>
+        <p>${pin.description}</p>
+        <button class="btn btn-primary btn-sm mt-2 create-event-btn" 
+          data-name="${pin.title.replace(/"/g, '&quot;')}">
+          Create Event Here
+        </button>
+      `))
+      .addTo(map);
+  }
+  
   async function loadRestaurants(lat, lng) {
     try {
       console.log(`Fetching restaurants near [${lat}, ${lng}]...`);
