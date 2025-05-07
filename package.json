@@ -5,6 +5,9 @@
   "scripts": {
     "start": "node index.mjs"
   },
+  "engines": {
+  "node": "16.x"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
