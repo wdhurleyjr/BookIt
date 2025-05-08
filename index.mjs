@@ -178,7 +178,6 @@ app.get('/api/weather', isAuthenticated, async (req, res) => {
     res.status(500).json({ message: "Error fetching weather data" });
   }
 });
-// Add these endpoints before app.listen()
 app.post('/api/savePin', isAuthenticated, async (req, res) => {
   const { lat, lng, title, description } = req.body;
   const userId = req.session.userId;
