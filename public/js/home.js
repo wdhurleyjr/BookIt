@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
   });
 
-     // Existing Core Functions
+    
    async function initializeMap() {
     // Geolocation Logic
     if (navigator.geolocation) {
