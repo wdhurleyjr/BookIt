@@ -1,6 +1,6 @@
 import express from 'express';
 import mysql from 'mysql2/promise';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import session from 'express-session';
 
 // test
@@ -168,10 +168,35 @@ app.post('/api/savePlace', isAuthenticated, async (req, res) => {
 app.get('/api/weather', isAuthenticated, async (req, res) => {
   const { lat, lng } = req.query;
   const apiKey = "f28e28db5182453b865203056242803";
+
   try {
     const url = `https://api.weatherapi.com/v1/current.json?key=${apiKey}&q=${lat},${lng}&aqi=no`;
     const response = await fetch(url);
     const data = await response.json();
+
+    // Map weather conditions to emojis
+    const condition = data.current.condition.text.toLowerCase();
+    let weatherEmoji = '';
+
+    if (condition.includes('sunny') || condition.includes('clear')) {
+      weatherEmoji = '☀️';
+    } else if (condition.includes('cloudy')) {
+      weatherEmoji = '☁️';
+    } else if (condition.includes('rain') || condition.includes('drizzle')) {
+      weatherEmoji = '🌧️';
+    } else if (condition.includes('snow')) {
+      weatherEmoji = '❄️';
+    } else if (condition.includes('thunder') || condition.includes('storm')) {
+      weatherEmoji = '⛈️';
+    } else if (condition.includes('fog') || condition.includes('mist')) {
+      weatherEmoji = '🌫️';
+    } else {
+      weatherEmoji = '🌤️'; // Default emoji for other conditions
+    }
+
+    // Add the emoji to the response
+    data.current.weatherEmoji = weatherEmoji;
+
     res.json(data);
   } catch (error) {
     console.error(`[ERROR] /api/weather`, error);
@@ -205,6 +230,7 @@ app.get('/api/getPins', isAuthenticated, async (req, res) => {
   }
 });
 
-app.listen(3000, () => {
-  console.log('Express server running on http://localhost:3000');
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Express server running on port ${PORT}`);
 });
