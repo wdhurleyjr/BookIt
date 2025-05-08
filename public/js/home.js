@@ -5,14 +5,13 @@ document.addEventListener('DOMContentLoaded', async function () {
   const map = new mapboxgl.Map({
     container: 'map',
     style: 'mapbox://styles/mapbox/streets-v11',
-    center: [-122.4194, 37.7749], // Default to San Francisco
+    center: [-122.4194, 37.7749], 
     zoom: 13
   });
 
   await initializeMap();
   
 
-   // Custom Pin Handlers
   document.getElementById('addPinBtn')?.addEventListener('click', () => {
     addPinMode = true;
     document.getElementById('pinControls').classList.remove('d-none');
